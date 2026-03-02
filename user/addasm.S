@@ -76,22 +76,25 @@ fd_sp:
     call exit
 
 err_read:
-    la a0, read_err
-    call printf
+    li a0, 2
+    la a1, read_err
+    call fprintf
     addi sp, sp, 64
     li a0, 1
     call exit
 
 err_empty:
-    la a0, empty_err
-    call printf
+    li a0, 2
+    la a1, empty_err
+    call fprintf
     addi sp, sp, 64
     li a0, 1
     call exit
 
 err_first_space:
-    la a0, first_space_err
-    call printf
+    li a0, 2
+    la a1, first_space_err
+    call fprintf
     addi sp, sp, 64
     li a0, 1
     call exit
@@ -104,15 +107,17 @@ err_no_space:
     call exit
 
 err_no_second:
-    la a0, no_second_err
-    call printf
+    li a0, 2
+    la a1, no_second_err
+    call fprintf
     addi sp, sp, 64
     li a0, 1
     call exit
 
 err_double_space:
-    la a0, double_space_err
-    call printf
+    li a0, 2
+    la a1, double_space_err
+    call fprintf
     addi sp, sp, 64
     li a0, 1
     call exit

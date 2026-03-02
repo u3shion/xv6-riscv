@@ -15,7 +15,7 @@ void read_srt(char *buf)
 
         if (code < 0)
         {
-            printf("%s", "Error in reading\n");
+            fprintf(2, "Error in reading\n");
             exit(1);
         }
 
@@ -37,13 +37,13 @@ void parse_nums(char *buf, int *num1, int *num2)
 
     if (sp == buf)
     {
-        printf("%s", "Error: first symbol is space.\n");
+        fprintf(2, "Error: first symbol is space.\n");
         exit(1);
     }
 
     if (*sp != ' ')
     {
-        printf("%s", "Error: no space after first number.\n");
+        fprintf(2, "Error: no space after first number.\n");
         exit(1);
     }
 
@@ -53,7 +53,7 @@ void parse_nums(char *buf, int *num1, int *num2)
 
     if (*ptr2 == '\0' || *ptr2 == ' ')
     {
-        printf("%s", "Error: double space or no second number.\n");
+        fprintf(2, "Error: double space or no second number.\n");
         exit(1);
     }
 
