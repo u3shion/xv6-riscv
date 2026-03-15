@@ -31,8 +31,18 @@ int main(int argc, char *argv[])
             kill(pid);
         }
 
-        wait(&stat);
-        printf("%d %d\n", pid, stat);
+        int wpid = wait(&stat);
+        if (wpid < 0)
+        {
+            fprintf(2, "wait error\n");
+            exit(1);
+        }
+        if (wpid != pid)
+        {
+            fprintf(2, "wait: expected pid %d, got %d\n", pid, wpid);
+            exit(1);
+        }
+        printf("%d %d\n", wpid, stat);
         exit(0);
     }
 }
