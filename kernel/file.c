@@ -60,12 +60,21 @@ void
 fileclose(struct file *f)
 {
   struct file ff;
+  struct sleeplock *m = 0;
+  int unlock_mutex = 0;
 
   acquire(&ftable.lock);
   if(f->ref < 1)
     panic("fileclose");
-  if(--f->ref > 0){
+  if (f->type == FD_MUTEX) {
+    m = f->mutex;
+    if (holdingsleep(m))
+      unlock_mutex = 1;
+  }
+  if (--f->ref > 0) {
     release(&ftable.lock);
+    if (unlock_mutex)
+      releasesleep(m);
     return;
   }
   ff = *f;
@@ -75,7 +84,12 @@ fileclose(struct file *f)
 
   if(ff.type == FD_PIPE){
     pipeclose(ff.pipe, ff.writable);
-  } else if(ff.type == FD_INODE || ff.type == FD_DEVICE){
+  } else if (ff.type == FD_MUTEX) {
+    if (unlock_mutex)
+      releasesleep(ff.mutex);
+
+    mutexclose(ff.mutex);
+  } else if (ff.type == FD_INODE || ff.type == FD_DEVICE) {
     begin_op();
     iput(ff.ip);
     end_op();
@@ -122,6 +136,8 @@ fileread(struct file *f, uint64 addr, int n)
     if((r = readi(f->ip, 1, addr, f->off, n)) > 0)
       f->off += r;
     iunlock(f->ip);
+  } else if (f->type == FD_MUTEX) {
+    return -1;
   } else {
     panic("fileread");
   }
@@ -171,10 +187,11 @@ filewrite(struct file *f, uint64 addr, int n)
       i += r;
     }
     ret = (i == n ? n : -1);
+  } else if (f->type == FD_MUTEX) {
+    return -1;
   } else {
     panic("filewrite");
   }
 
   return ret;
 }
-
