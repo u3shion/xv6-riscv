@@ -53,12 +53,16 @@ int main(int argc, char *argv[])
       need = sizeof(buf);
 
     int r = read(fd, buf, need);
-    if (r != need)
+
+    if (r < 0)
     {
       fprintf(2, "Read error\n");
       close(fd);
       exit(1);
     }
+
+    if (r == 0)
+      break;
 
     for (int i = 0; i < r; i++)
       printbyte(1, (unsigned char)buf[i], &fst);

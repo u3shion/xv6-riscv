@@ -67,15 +67,24 @@ int main(int argc, char *argv[])
     exit(1);
   }
 
-  int ret = write(fd, buf, n);
+  int written = 0;
+
+  while (written < n)
+  {
+    int w = write(fd, buf + written, n - written);
+
+    if (w <= 0)
+    {
+      fprintf(2, "Write error\n");
+      close(fd);
+      free(buf);
+      exit(1);
+    }
+
+    written += w;
+  }
   close(fd);
   free(buf);
-
-  if (ret != n)
-  {
-    fprintf(2, "Write error\n");
-    exit(1);
-  }
 
   exit(0);
 }

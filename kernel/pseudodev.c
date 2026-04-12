@@ -9,7 +9,8 @@
 #include "file.h"
 #include "proc.h"
 
-static struct spinlock pseudo_lock;
+static struct spinlock pseudo_seed_lock;
+static struct spinlock pseudo_stat_lock;
 static uint64 urandom_seed = 1;
 static uint64 nullstat_written = 0;
 
@@ -22,6 +23,7 @@ lcg_next(uint64 x)
 int pseudoread(int minor, int user_dst, uint64 dst, int n)
 {
   char buf[64];
+  static const char zero_buf[64] = {0};
   uint64 tmp;
   int i;
 
@@ -39,9 +41,7 @@ int pseudoread(int minor, int user_dst, uint64 dst, int n)
       if (rem > (int)sizeof(buf))
         rem = sizeof(buf);
 
-      memset(buf, 0, rem);
-
-      if (either_copyout(user_dst, dst + i, buf, rem) < 0)
+      if (either_copyout(user_dst, dst + i, (void *)zero_buf, rem) < 0)
         return -1;
 
       i += rem;
@@ -61,13 +61,13 @@ int pseudoread(int minor, int user_dst, uint64 dst, int n)
       if (rem > (int)sizeof(buf))
         rem = sizeof(buf);
 
-      acquire(&pseudo_lock);
+      acquire(&pseudo_seed_lock);
       for (int j = 0; j < rem; j++)
       {
         urandom_seed = lcg_next(urandom_seed);
         buf[j] = (char)(urandom_seed >> 56);
       }
-      release(&pseudo_lock);
+      release(&pseudo_seed_lock);
 
       if (either_copyout(user_dst, dst + i, buf, rem) < 0)
         return -1;
@@ -83,9 +83,9 @@ int pseudoread(int minor, int user_dst, uint64 dst, int n)
     if (n != (int)sizeof(uint64))
       return -1;
 
-    acquire(&pseudo_lock);
+    acquire(&pseudo_stat_lock);
     tmp = nullstat_written;
-    release(&pseudo_lock);
+    release(&pseudo_stat_lock);
 
     if (either_copyout(user_dst, dst, &tmp, sizeof(tmp)) < 0)
       return -1;
@@ -114,18 +114,18 @@ int pseudowrite(int minor, int user_src, uint64 src, int n)
     if (either_copyin(&tmp, user_src, src, sizeof(tmp)) < 0)
       return -1;
 
-    acquire(&pseudo_lock);
+    acquire(&pseudo_seed_lock);
     urandom_seed = tmp;
-    release(&pseudo_lock);
+    release(&pseudo_seed_lock);
 
     return n;
   }
 
   if (minor == PSEUDO_NULLSTAT)
   {
-    acquire(&pseudo_lock);
+    acquire(&pseudo_stat_lock);
     nullstat_written += (uint64)n;
-    release(&pseudo_lock);
+    release(&pseudo_stat_lock);
 
     return n;
   }
@@ -135,7 +135,8 @@ int pseudowrite(int minor, int user_src, uint64 src, int n)
 
 void pseudoinit(void)
 {
-  initlock(&pseudo_lock, "pseudo");
+  initlock(&pseudo_seed_lock, "pseudo_seed");
+  initlock(&pseudo_stat_lock, "pseudo_stat");
   devsw[PSEUDO_MAJOR].read = pseudoread;
   devsw[PSEUDO_MAJOR].write = pseudowrite;
 }
