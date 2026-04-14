@@ -8,12 +8,20 @@
 #define HEAP_ARRAY_SIZE (3 * PAGE_SIZE)
 
 int global_var = GLOBAL_VAR_VALUE;
+int mask_a = 1 << 6;
+int mask_d = 1 << 7;
 
 void print_separator(const char *title)
 {
     printf("\n========================================\n");
     printf("  %s\n", title);
     printf("========================================\n");
+}
+
+void show_flags_status(const char *label, void *buf, int len, const char *flag_name, int mask)
+{
+    int result = checkflags(buf, len, mask);
+    printf("[%s] %s flag: %s\n", label, flag_name, result ? "1 (SET)" : "0 (NOT SET)");
 }
 
 int main(void)
@@ -24,10 +32,23 @@ int main(void)
     printpgtable();
 
     print_separator("Access global variable");
-    printf("Global variable value: %d\n", global_var);
+    printf("BEFORE: Global variable = %d\n", global_var);
+    show_flags_status("BEFORE", (void *)&global_var, sizeof(int), "A", mask_a);
+    show_flags_status("BEFORE", (void *)&global_var, sizeof(int), "D", mask_d);
+
+    int val = global_var;
+    printf("Read value: %d\n", val);
+
+    show_flags_status("AFTER READ", (void *)&global_var, sizeof(int), "A", mask_a);
+    show_flags_status("AFTER READ", (void *)&global_var, sizeof(int), "D", mask_d);
+
     global_var = 100;
     printf("Modified global variable: %d\n", global_var);
-    printf("\nPage table after accessing global variable:\n\n");
+
+    show_flags_status("AFTER WRITE", (void *)&global_var, sizeof(int), "A", mask_a);
+    show_flags_status("AFTER WRITE", (void *)&global_var, sizeof(int), "D", mask_d);
+
+    printf("\nPage table after global variable access:\n\n");
     printpgtable();
 
     print_separator("Stack variables");
@@ -55,10 +76,16 @@ int main(void)
     printf("Heap array allocated at: %p\n", (void *)heap_arr);
     printf("Heap array end: %p\n", (void *)(heap_arr + HEAP_ARRAY_SIZE / sizeof(int)));
 
+    show_flags_status("AFTER ALLOCATION", (void *)heap_arr, PAGE_SIZE, "A", mask_a);
+    show_flags_status("AFTER ALLOCATION", (void *)heap_arr, PAGE_SIZE, "D", mask_d);
+
     printf("\nPage table after allocation:\n\n");
     printpgtable();
 
     print_separator("First access to heap (read)");
+
+    show_flags_status("BEFORE", (void *)heap_arr, PAGE_SIZE, "A", mask_a);
+    show_flags_status("BEFORE", (void *)heap_arr, PAGE_SIZE, "D", mask_d);
 
     int val1 = heap_arr[0];
     int val2 = heap_arr[PAGE_SIZE / sizeof(int)];
@@ -66,31 +93,34 @@ int main(void)
 
     printf("Read values: %d, %d, %d\n", val1, val2, val3);
 
+    show_flags_status("AFTER READ (page 1)", (void *)heap_arr, PAGE_SIZE, "A", mask_a);
+    show_flags_status("AFTER READ (page 1)", (void *)heap_arr, PAGE_SIZE, "D", mask_d);
+    show_flags_status("AFTER READ (all heap)", (void *)heap_arr, HEAP_ARRAY_SIZE, "A", mask_a);
+    show_flags_status("AFTER READ (all heap)", (void *)heap_arr, HEAP_ARRAY_SIZE, "D", mask_d);
+
     printf("\nPage table after reading from heap:\n\n");
     printpgtable();
 
-    print_separator("Check Accessed flag after read");
-    int mask_a = 1 << 6;
-
-    int has_a_flag = checkflags((void *)heap_arr, PAGE_SIZE, mask_a);
-    printf("First heap page has Accessed flag: %s\n", has_a_flag ? "YES" : "NO");
-
     print_separator("Write to heap");
+
+    show_flags_status("BEFORE", (void *)heap_arr, HEAP_ARRAY_SIZE, "A", mask_a);
+    show_flags_status("BEFORE", (void *)heap_arr, HEAP_ARRAY_SIZE, "D", mask_d);
 
     heap_arr[0] = 999;
     heap_arr[PAGE_SIZE / sizeof(int)] = 777;
     heap_arr[(2 * PAGE_SIZE) / sizeof(int)] = 555;
+    printf("Values written\n");
 
-    printf("Page table after writing to heap:\n\n");
+    show_flags_status("AFTER WRITE", (void *)heap_arr, HEAP_ARRAY_SIZE, "A", mask_a);
+    show_flags_status("AFTER WRITE", (void *)heap_arr, HEAP_ARRAY_SIZE, "D", mask_d);
+
+    printf("\nPage table after writing to heap:\n\n");
     printpgtable();
 
-    print_separator("Check Dirty flag after write");
-    int mask_d = 1 << 7;
-
-    int has_d_flag = checkflags((void *)heap_arr, HEAP_ARRAY_SIZE, mask_d);
-    printf("Heap pages have Dirty flag: %s\n", has_d_flag ? "YES" : "NO");
-
     print_separator("Clear A and D flags");
+
+    show_flags_status("BEFORE", (void *)heap_arr, HEAP_ARRAY_SIZE, "A", mask_a);
+    show_flags_status("BEFORE", (void *)heap_arr, HEAP_ARRAY_SIZE, "D", mask_d);
 
     int mask_ad = mask_a | mask_d;
     int result = clearflags((void *)heap_arr, HEAP_ARRAY_SIZE, mask_ad);
@@ -98,30 +128,43 @@ int main(void)
     if (result != 0)
         printf("Error clearing flags\n");
 
-    printf("Page table after clearing flags:\n\n");
+    show_flags_status("AFTER CLEAR", (void *)heap_arr, HEAP_ARRAY_SIZE, "A", mask_a);
+    show_flags_status("AFTER CLEAR", (void *)heap_arr, HEAP_ARRAY_SIZE, "D", mask_d);
+
+    printf("\nPage table after clearing flags:\n\n");
     printpgtable();
 
     print_separator("Access after flag clearing");
+
+    show_flags_status("BEFORE", (void *)heap_arr, HEAP_ARRAY_SIZE, "A", mask_a);
+    show_flags_status("BEFORE", (void *)heap_arr, HEAP_ARRAY_SIZE, "D", mask_d);
+
     int read_val = heap_arr[PAGE_SIZE / sizeof(int) + 10];
     printf("Read value: %d\n", read_val);
 
     heap_arr[PAGE_SIZE / sizeof(int) + 20] = 333;
+    printf("Written to page 2\n");
+
+    show_flags_status("AFTER ACCESS (page 1)", (void *)heap_arr, PAGE_SIZE, "A", mask_a);
+    show_flags_status("AFTER ACCESS (page 1)", (void *)heap_arr, PAGE_SIZE, "D", mask_d);
+    show_flags_status("AFTER ACCESS (page 2 only)", (void *)(heap_arr + PAGE_SIZE / sizeof(int)), PAGE_SIZE, "A", mask_a);
+    show_flags_status("AFTER ACCESS (page 2 only)", (void *)(heap_arr + PAGE_SIZE / sizeof(int)), PAGE_SIZE, "D", mask_d);
+    show_flags_status("AFTER ACCESS (all heap)", (void *)heap_arr, HEAP_ARRAY_SIZE, "A", mask_a);
+    show_flags_status("AFTER ACCESS (all heap)", (void *)heap_arr, HEAP_ARRAY_SIZE, "D", mask_d);
 
     printf("\nPage table after access:\n\n");
     printpgtable();
 
-    print_separator("Verify flags reappeared");
-    has_a_flag = checkflags((void *)heap_arr, PAGE_SIZE, mask_a);
-    has_d_flag = checkflags((void *)heap_arr, HEAP_ARRAY_SIZE, mask_d);
-    printf("Accessed flag present: %s\n", has_a_flag ? "YES" : "NO");
-    printf("Dirty flag present: %s\n", has_d_flag ? "YES" : "NO");
+    print_separator("Demonstrate clear/check on specific pages");
 
-    print_separator("Global variable access again");
-    printf("Current global variable: %d\n", global_var);
-    global_var = 200;
-    printf("Modified global variable: %d\n", global_var);
+    show_flags_status("BEFORE CLEARING A FLAG (page 2)", (void *)(heap_arr + PAGE_SIZE / sizeof(int)), PAGE_SIZE, "A", mask_a);
 
-    printf("\nPage table after global variable access:\n\n");
+    clearflags((void *)(heap_arr + PAGE_SIZE / sizeof(int)), PAGE_SIZE, mask_a);
+
+    show_flags_status("AFTER CLEARING A FLAG (page 2)", (void *)(heap_arr + PAGE_SIZE / sizeof(int)), PAGE_SIZE, "A", mask_a);
+    show_flags_status("AFTER (all heap)", (void *)heap_arr, HEAP_ARRAY_SIZE, "A", mask_a);
+
+    printf("\nPage table after clearing:\n\n");
     printpgtable();
 
     print_separator("Free heap memory");
@@ -135,5 +178,6 @@ int main(void)
 
     printf("Page table after memory deallocation:\n\n");
     printpgtable();
+
     exit(0);
 }
