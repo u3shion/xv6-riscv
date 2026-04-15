@@ -150,6 +150,9 @@ void            uartwrite(char [], int);
 void            uartputc_sync(int);
 int             uartgetc(void);
 
+// rtc.c
+uint64          rtctime(void);
+
 // vm.c
 void            kvminit(void);
 void            kvminithart(void);
