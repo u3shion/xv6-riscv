@@ -302,6 +302,9 @@ kfork(void)
   np->state = RUNNABLE;
   release(&np->lock);
 
+  if (log_active(LOG_PROC))
+    pr_msg("proc: fork pid=%d name=%s -> child pid=%d", p->pid, p->name, pid);
+
   return pid;
 }
 
@@ -330,6 +333,16 @@ kexit(int status)
 
   if(p == initproc)
     panic("init exiting");
+
+  if (log_active(LOG_PROC)) {
+    int ppid = 0;
+
+    acquire(&wait_lock);
+    if (p->parent) ppid = p->parent->pid;
+    release(&wait_lock);
+    
+    pr_msg("proc: exit pid=%d name=%s status=%d parent=%d", p->pid, p->name, status, ppid);
+  }
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){

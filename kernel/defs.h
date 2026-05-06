@@ -9,6 +9,21 @@ struct sleeplock;
 struct stat;
 struct superblock;
 
+// dmesg.c
+void            dmesg_init(void);
+void            pr_msg(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
+int             log_active(int flag);
+extern int      log_flags;
+uint64          sys_dmesg(void);
+uint64          sys_logctl(void);
+
+// Logging class flags
+#define LOG_SYSCALLS   0x01
+#define LOG_INTERRUPTS 0x02
+#define LOG_PROC       0x04
+#define LOG_EXEC       0x08
+#define LOG_ALL        0x0f
+
 // bio.c
 void            binit(void);
 struct buf*     bread(uint, uint);
